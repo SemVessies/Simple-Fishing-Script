@@ -1,50 +1,24 @@
-import com.sun.xml.internal.ws.policy.*;
-import jdk.management.resource.internal.inst.*;
 import org.dreambot.api.*;
 import org.dreambot.api.input.*;
-import org.dreambot.api.methods.*;
 import org.dreambot.api.methods.container.impl.*;
-import org.dreambot.api.methods.container.impl.bank.*;
-import org.dreambot.api.methods.dialogues.*;
-import org.dreambot.api.methods.input.*;
 import org.dreambot.api.methods.input.mouse.*;
 import org.dreambot.api.methods.interactive.*;
 import org.dreambot.api.methods.map.*;
 import org.dreambot.api.methods.skills.*;
-import org.dreambot.api.methods.tabs.*;
-import org.dreambot.api.methods.walking.impl.*;
 import org.dreambot.api.script.*;
-import org.dreambot.api.utilities.impl.*;
+import org.dreambot.api.utilities.*;
 import org.dreambot.api.wrappers.interactive.*;
-import org.dreambot.api.wrappers.interactive.Character;
 import org.dreambot.core.*;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.nio.channels.*;
 import java.util.*;
 
-import static org.dreambot.api.methods.Calculations.generateRandomString;
-import static org.dreambot.api.methods.Calculations.random;
+import static org.dreambot.api.methods.Calculations.*;
 import static org.dreambot.api.methods.container.impl.bank.Bank.*;
-import static org.dreambot.api.methods.skills.SkillTracker.getGainedExperience;
 
-@ScriptManifest(author = "Sem", name = "CraftingScript", version = 1.0, description = "Crafting amulets (U)", category = Category.MONEYMAKING)
+@ScriptManifest(author = "Sem", name = "Simple Fishing", version = 1.0, description = "Fishing at Barbarian Village", category = Category.MONEYMAKING)
 public class Main extends AbstractScript {
-
-    public void onStart() {
-        SkillTracker.start(Skill.THIEVING); //Start tracking Thieving xp
-        SkillTracker.start(Skill.FISHING); //Start tracking Fishing xp
-        SkillTracker.start(Skill.CRAFTING); //Start tracking Crafting xp
-
-        log("Script opstarten.");
-        log("Begin van het script.");
-    }
-
-    public void onExit() {
-        log("Einde van het script.");
-        log("Script afsluiten.");
-    }
 
     //    Fishing Supplies
     public int Feather = 314;
@@ -58,20 +32,11 @@ public class Main extends AbstractScript {
         return Players.getLocal().isAnimating();
     }
 
-    // Crafting
-    Area EdgevilleBank = new Area(3094, 3496, 3098, 3494);
-    Area GrandExchange = new Area(3161, 3493, 3168, 3486);
-
-    // Fishing
+    // Fishing coordinates
     Area BarbarianVillageFishingArea = new Area(3104, 3434, 3113, 3431); //
     Area BarbarianVillageFishingNorth = new Area(3109, 3434, 3109, 3432);
     Area BarbarianVillageFishingSouth = new Area(3103, 3425, 3103, 3424);
 
-    // Thieving Area/NPC/Gameobjects
-    Area DraynorSquare = new Area(3083, 3253, 3077, 3248); // Coördinates of Draynor Square
-    Area DraynorSquareBig = new Area(3073, 3256, 3087, 3243);
-
-    NPC MasterFarmer = NPCs.closest("Master Farmer");
 
     public void dropOnlyThese(Integer[] droppables, int[] dropOrder) {
         // the grid construction should be in your constructor.
@@ -86,13 +51,13 @@ public class Main extends AbstractScript {
         }
 
         // Code to drop items
-        Instance instance = Client.getInstance();
-        Canvas canvas = Instance.getCanvas();
-        Inventory inventory = Inventory.get();
+        Instance instance = Client.getInstance();           // ...
+        Canvas canvas = Instance.getCanvas();               // ...
+        Inventory inventory = (Inventory) Inventory.all();  // Gets all items in inventory
 
-        instance.setKeyboardInputEnabled(true);
+        instance.setKeyboardInputEnabled(true);             // Allows Keyboard input
         Mouse.getMouseSettings();
-        MouseSettings.setSpeed(random(2, 4));
+        MouseSettings.setSpeed(random(2, 4));               // Sets mouse speed
         canvas.dispatchEvent(new KeyEvent(canvas, KeyEvent.KEY_PRESSED, System.currentTimeMillis(), 0, KeyEvent.VK_SHIFT, KeyEvent.CHAR_UNDEFINED));
         for (int r = 0; r < dropOrder.length; r++) {
             if (Inventory.getItemInSlot(dropOrder[r]) != null && Arrays.asList(droppables).contains(Inventory.getItemInSlot(dropOrder[r]).getID())) {
@@ -109,12 +74,8 @@ public class Main extends AbstractScript {
         instance.setKeyboardInputEnabled(false);
     }
 
-//    public void setLocalPlayer(Character localPlayer) {
-//        this.getLocalPlayer = localPlayer;
-//    }
-
     private enum State {
-        WALKSHORT, CRAFT, BANK, FISH, DROP, STEAL, BANKDRAYNOR
+        FISH, DROP
     }
 
     private State getState() {
@@ -129,4 +90,129 @@ public class Main extends AbstractScript {
         }
         return null;
     }
+
+    public void onStart() {
+        SkillTracker.start(Skill.FISHING); //Start tracking Fishing xp
+
+        log("Script opstarten.");
+        log("Begin van het script.");
+    }
+
+    @Override
+    public int onLoop() {
+
+
+        log("Inventory contains Fly Fishing Rod and Feathers: " + Inventory.contains(Feather, FlyFishingRod));
+        log("Inventory contains Salmon and/or Trout: " + Inventory.contains(RawSalmon, RawTrout));
+        log("Player's location is at the Barbarian Village fishing spot: " + BarbarianVillageFishingArea.contains(Players.getLocal()));
+
+        switch (getState()) {
+            case FISH:
+                log("About to reel in some fish");
+                NPC FishingSpot = NPCs.closest(f -> f != null && f.getName().contains("Fishing spot") && BarbarianVillageFishingArea.contains(f));
+                log(FishingSpot);
+
+                if (FishingSpot != null) {
+                    if (FishingSpot.interact()) {
+                        Sleep.sleepUntil(() -> !FishingSpot.exists(), random(4000, 6000));
+                    }
+                }
+                break;
+
+//                if (!isFishing()) {
+//                    if (FishingSpot != null) {
+//                        sleep(random(1000, 2000));
+//                        if (FishingSpot.interactForceLeft(null)) {
+//                            Sleep.sleepUntil(() -> Players.getLocal().isAnimating(), 2000);
+//                        } else {
+//                            sleep(3000);
+//                        }
+//                    }
+//                }
+//                break;
+
+            case DROP:
+                log("Inventory is Full. Dropping fish now!");
+                int minimum = 1;
+                int maximum = 250;
+
+                int RandomNumber = (int) Math.floor(Math.random() * (maximum - minimum + 1) + minimum);
+                log(RandomNumber);
+
+                Integer[] dropables = {RawSalmon, RawTrout, ClueBottleBeginner}; // Trout, Salmon and BeginnerClue
+
+                if (Inventory.isFull()) {
+                    if (RandomNumber < 50) {
+                        placeHoldersEnabled();
+
+                        log("Dropping items *Drunken Walk* Style");
+
+                        int[] dropOrder = {0, 1, 2, 3, 7, 6, 5, 4, 8, 9, 10, 11, 15, 14, 13, 12, 16, 17, 18, 19, 23, 22, 21, 20, 24, 25, 26, 27}; // DrunkenWalk Pattern
+                        dropOnlyThese(dropables, dropOrder);
+                        if (!Inventory.isEmpty()) {
+                            Inventory.dropAll(RawSalmon, RawTrout);
+                        }
+                        sleep(random(750, 1500));
+                    }
+
+                    if (RandomNumber >= 50 && RandomNumber <= 100) {
+                        log("Dropping items *ZigZag* Style");
+//                        Integer[] dropables = {RawSalmon, RawTrout, ClueBottleBeginner}; // Trout, Salmon and BeginnerClue
+                        int[] dropOrder = {0, 1, 4, 5, 8, 9, 12, 13, 16, 17, 20, 21, 24, 25, 26, 27, 22, 23, 18, 19, 14, 15, 10, 11, 6, 7, 2, 3}; // ZigZag Pattern
+                        dropOnlyThese(dropables, dropOrder);
+                        if (!Inventory.isEmpty()) {
+                            Inventory.dropAll(dropables);
+//                            Inventory.dropAll(RawSalmon, RawTrout);
+                        }
+                        sleep(random(750, 1500));
+                    }
+
+                    if (RandomNumber > 100 && RandomNumber <= 150) {
+                        log("");
+                        log("Dropping items *Small Drunken Walk* Style");
+//                        Integer[] dropables = {RawSalmon, RawTrout, ClueBottleBeginner}; // Trout, Salmon and BeginnerClue
+                        int[] dropOrder = {0, 1, 5, 4, 8, 9, 13, 12, 16, 17, 21, 20, 25, 25, 26, 27, 23, 22, 18, 19, 15, 14, 10, 11, 7, 6, 2, 3}; // SmallDrunkenWalk Pattern
+                        dropOnlyThese(dropables, dropOrder);
+                        if (!Inventory.isEmpty()) {
+                            Inventory.dropAll(dropables);
+//                            Inventory.dropAll(RawSalmon, RawTrout, ClueBottleBeginner);
+                        }
+                        sleep(random(750, 1500));
+                    }
+
+                    if (RandomNumber > 150 && RandomNumber <= 200) {
+                        log("Dropping items *Up to Down - Down to Up* Style");
+//                        Integer[] dropables = {RawSalmon, RawTrout, ClueBottleBeginner}; // Trout, Salmon and BeginnerClue
+                        int[] dropOrder = {0, 4, 8, 12, 16, 17, 20, 24, 25, 21, 17, 13, 9, 5, 1, 2, 6, 10, 14, 18, 22, 26, 27, 23, 19, 15, 11, 7, 3}; //up to down - down to up
+                        dropOnlyThese(dropables, dropOrder);
+                        if (!Inventory.isEmpty()) {
+                            Inventory.dropAll(dropables);
+//                            Inventory.dropAll(RawSalmon, RawTrout, ClueBottleBeginner);
+                        }
+                    }
+
+                    if (RandomNumber > 200 && RandomNumber <= 250) {
+                        log("Dropping items Up to Down - Up to Down Style");
+//                        Integer[] dropables = {RawSalmon, RawTrout, ClueBottleBeginner}; // Trout, Salmon and BeginnerClue
+                        int[] dropOrder = {0, 4, 8, 12, 16, 20, 24, 1, 5, 9, 13, 17, 21, 25, 2, 6, 10, 14, 18, 22, 26, 3, 7, 11, 15, 19, 23, 27};
+                        dropOnlyThese(dropables, dropOrder);
+                        if (!Inventory.isEmpty()) {
+                            Inventory.dropAll(dropables);
+//                            Inventory.dropAll(RawSalmon, RawTrout, ClueBottleBeginner);
+                        }
+                    }
+                }
+                break;
+
+
+        }
+        return 0;
+    }
+
+
+    public void onExit() {
+        log("Einde van het script.");
+        log("Script afsluiten.");
+    }
 }
+
